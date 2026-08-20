@@ -2,6 +2,8 @@
 
 #    include "bx_canfd.h"
 
+#    define BX_CANFD_TX_FIFO_FULL_RETRIES 5U
+
 static bool bx_canfd_set_filter(rcan* can);
 
 static bool bx_canfd_set_timing(rcan* can, uint32_t bitrate);
@@ -29,7 +31,7 @@ bool bx_canfd_start(rcan* can, uint32_t channel, uint32_t bitrate)
     can->handle.Init.FrameFormat  = FDCAN_FRAME_CLASSIC;
     can->handle.Init.Mode         = FDCAN_MODE_NORMAL;
 
-    can->handle.Init.AutoRetransmission = DISABLE;
+    can->handle.Init.AutoRetransmission = ENABLE;
     can->handle.Init.TransmitPause      = DISABLE;
     can->handle.Init.ProtocolException  = DISABLE;
 
@@ -140,8 +142,16 @@ bool bx_canfd_send(rcan* can, rcan_frame* frame)
     if (can == NULL || frame == NULL || frame->type == nonframe || frame->len > RCAN_MAX_FRAME_PAYLOAD_SIZE)
         return false;
 
-    if (HAL_FDCAN_GetTxFifoFreeLevel(&can->handle) == 0)
-        return false;
+    /* The TX FIFO is only 3 elements deep and drains asynchronously in
+     * hardware within microseconds - a handful of immediate re-checks is
+     * enough to ride out a momentary full condition instead of dropping
+     * the frame outright. */
+    uint32_t retries_left = BX_CANFD_TX_FIFO_FULL_RETRIES;
+    while (HAL_FDCAN_GetTxFifoFreeLevel(&can->handle) == 0)
+    {
+        if (--retries_left == 0)
+            return false;
+    }
 
     FDCAN_TxHeaderTypeDef tx_header = {0};
 
