@@ -276,22 +276,58 @@ static bool bx_canfd_make_can_tx_header(rcan_frame* frame, FDCAN_TxHeaderTypeDef
 
 static bool bx_canfd_enable_rx_notification(rcan* can)
 {
-    // Activate notifications for Rx FIFO 0
     return HAL_FDCAN_ActivateNotification(&can->handle, FDCAN_IT_RX_FIFO0_NEW_MESSAGE, 0) == HAL_OK;
 }
 
 static bool bx_canfd_enable_tx_notification(rcan* can)
 {
-    // Activate notifications for Tx operation is complete
     return HAL_FDCAN_ActivateNotification(&can->handle,
-                                           FDCAN_IT_TX_COMPLETE,
-                                           FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2) == HAL_OK;
+                                          FDCAN_IT_TX_COMPLETE,
+                                          FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2) == HAL_OK;
 }
 
 static bool bx_canfd_enable_err_notification(rcan* can)
 {
-    // Activate notifications for FDCAN error list
     return HAL_FDCAN_ActivateNotification(&can->handle, FDCAN_IT_LIST_PROTOCOL_ERROR, 0) == HAL_OK;
+}
+
+void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef* hfdcan, uint32_t RxFifo0ITs)
+{
+    rcan* can = (rcan*) hfdcan;
+
+    if ((RxFifo0ITs & FDCAN_IT_RX_FIFO0_NEW_MESSAGE) == 0)
+        return;
+
+    FDCAN_RxHeaderTypeDef rx_header = {0};
+    rcan_frame            frame     = {0};
+
+    if (HAL_FDCAN_GetRxMessage(hfdcan, FDCAN_RX_FIFO0, &rx_header, frame.payload) != HAL_OK)
+        return;
+
+    frame.id   = rx_header.Identifier;
+    frame.len  = rx_header.DataLength;
+    frame.type = (rx_header.IdType == FDCAN_EXTENDED_ID) ? ext_id : std_id;
+    frame.rtr  = rx_header.RxFrameType == FDCAN_REMOTE_FRAME;
+
+    if (can->rx_cb != NULL)
+        can->rx_cb(can, &frame);
+}
+
+void HAL_FDCAN_TxBufferCompleteCallback(FDCAN_HandleTypeDef* hfdcan, uint32_t BufferIndexes)
+{
+    rcan* can = (rcan*) hfdcan;
+    (void) BufferIndexes;
+
+    if (can->tx_cb != NULL)
+        can->tx_cb(can);
+}
+
+void HAL_FDCAN_ErrorStatusCallback(FDCAN_HandleTypeDef* hfdcan, uint32_t ErrorStatusITs)
+{
+    rcan* can = (rcan*) hfdcan;
+
+    if (can->err_cb != NULL)
+        can->err_cb(can, ErrorStatusITs);
 }
 
 #endif  // defined(STM32G474xx) || defined(STM32G0B1xx)

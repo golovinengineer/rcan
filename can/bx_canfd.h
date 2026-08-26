@@ -38,6 +38,13 @@ typedef enum
     CE_SOME_TEC,
 } can_errors_t;
 
+struct can_iface;
+typedef struct can_iface rcan;
+
+typedef void (*bx_canfd_rx_cb_t)(rcan* can, const rcan_frame* frame);
+typedef void (*bx_canfd_tx_cb_t)(rcan* can);
+typedef void (*bx_canfd_err_cb_t)(rcan* can, uint32_t error_status);
+
 struct can_iface
 {
     FDCAN_HandleTypeDef handle;
@@ -48,8 +55,11 @@ struct can_iface
     bool                tx_notify_en;
     bool                err_notify_en;
     uint16_t            errors;
+
+    bx_canfd_rx_cb_t  rx_cb;
+    bx_canfd_tx_cb_t  tx_cb;
+    bx_canfd_err_cb_t err_cb;
 };
-typedef struct can_iface rcan;
 
 bool bx_canfd_filter_preconfiguration(rcan* can, uint32_t* accepted_ids, uint32_t size);
 
