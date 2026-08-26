@@ -281,7 +281,9 @@ static bool bx_canfd_enable_rx_notification(rcan* can)
 static bool bx_canfd_enable_tx_notification(rcan* can)
 {
     // Activate notifications for Tx operation is complete
-    return HAL_FDCAN_ActivateNotification(&can->handle, FDCAN_IT_TX_COMPLETE, 0) == HAL_OK;
+    return HAL_FDCAN_ActivateNotification(&can->handle,
+                                           FDCAN_IT_TX_COMPLETE,
+                                           FDCAN_TX_BUFFER0 | FDCAN_TX_BUFFER1 | FDCAN_TX_BUFFER2) == HAL_OK;
 }
 
 static bool bx_canfd_enable_err_notification(rcan* can)
