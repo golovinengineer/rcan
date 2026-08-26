@@ -212,9 +212,11 @@ static bool bx_canfd_set_filter(rcan* can)
 
 static bool bx_canfd_set_timing(rcan* can, uint32_t bitrate)
 {
-    // TODO check source of system tick for can !!! if not PCLK1 set error or some other sheet
-    // TODO add  uint32_t clock = HAL_RCC_GetPCLK1Freq();
-    uint32_t clock = SystemCoreClock;
+    if ((READ_REG(RCC->CCIPR2) & RCC_CCIPR2_FDCANSEL_Msk) != RCC_FDCANCLKSOURCE_PCLK1)
+        return false;
+
+    uint32_t clock = HAL_RCC_GetPCLK1Freq();
+
     // TODO add Divider + convert DIV to value real
     if (!rcan_calculate_timing(clock, bitrate, &can->timing))
         return false;
